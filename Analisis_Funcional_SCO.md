@@ -1,235 +1,198 @@
-# DOCUMENTO DE ANÁLISIS FUNCIONAL
-## Proyecto: SCO (Skate Spot Finder)
-**Pila tecnológica frontend:** Android (Jetpack Compose, Material 3)  
-**Arquitectura recomendada:** Clean Architecture + MVVM/MVI con Unidirectional Data Flow (UDF)  
-**Gestión de datos:** Room Database (Caché Offline-First), Retrofit / Ktor, WorkManager (Sincronización en segundo plano)
+# Especificación de Interfaz y Flujo de Pantallas (UI/UX)
+
+**Aplicación:** SCO (`com.skateco.sco`)  
+**Stack Cliente:** Android Nativo (Kotlin, Jetpack Compose, Material 3)  
+**Arquitectura:** Clean Architecture + MVVM (`StateFlow`)  
+**Persistencia y Red:** Room (Single Source of Truth), Retrofit/OkHttp, WorkManager
 
 ---
 
-# VISTA-01: Autenticación y Acceso (Login / Gateway)
-* **Figma Node ID:** `1:3` (`SCO Skate Spot Finder`)
+## VISTA-01: Autenticación y Acceso (`Login / Gateway`)
 
-### 1. Nombre de la pantalla e ID
-`VISTA-01: Autenticación y Acceso (Login / Gateway)`
+### 1. Objetivo funcional y roles
 
-### 2. Objetivo funcional y roles de acceso
-* **Objetivo funcional:** Actuar como pasarela de bienvenida y autenticación del sistema. Permite a los skaters identificarse mediante credenciales (email y contraseña) para acceder a sus spots guardados, valoraciones y funciones de comunidad. Proporciona una vía de bypass explícita (*"Continue as Guest"*) que permite explorar el mapa de spots en modo lectura sin forzar el registro inmediato.
-* **Roles con acceso:**
-  * **Invitado (Guest):** Acceso total. Pantalla inicial por defecto si no existe token de sesión persistente en el dispositivo.
-  * **USER:** Solo visible tras cierre explícito de sesión (*Sign Out*) o revocación de token.
-  * **ADMIN:** Idéntico a USER; los permisos de administración se resuelven a nivel de claims JWT tras autenticarse.
+- **Objetivo:** Pantalla de entrada a la aplicación. Permite iniciar sesión o registrarse para desbloquear la creación de _spots_ y los votos comunitarios, o entrar directamente en modo lectura mediante el acceso como invitado (_"Continue as Guest"_).
+- **Roles con acceso:**
+  - **Usuario Invitado:** Pantalla inicial por defecto si no hay sesión guardada en el dispositivo.
+  - **Skater (`USER`) / Moderador (`ADMIN`):** Solo acceden a esta vista tras cerrar sesión o si caduca su token JWT.
 
-### 3. Desglose de componentes interactivos
-1. **Input "EMAIL" (`OutlinedTextField`):**
-   * *Evento:* `onValueChange = { viewModel.onEmailChange(it) }`
-   * *RF cubierto:* **RF-01: Validación de formato de email.** Comprueba sintaxis RFC 5322. Configura `KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)`.
-2. **Input "PASSWORD" (`OutlinedTextField`):**
-   * *Evento:* `onValueChange = { viewModel.onPasswordChange(it) }`
-   * *RF cubierto:* **RF-02: Entrada de credenciales segura.** Aplica `visualTransformation = PasswordVisualTransformation()`. `KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)`.
-3. **Toggle de Visibilidad de Password (`IconButton` en trailing icon):**
-   * *Evento:* `onClick = { viewModel.togglePasswordVisibility() }`
-   * *RF cubierto:* **RF-02.1: Alternancia de máscara de contraseña.** Alterna entre `VisualTransformation.None` y `PasswordVisualTransformation()`.
-4. **Casilla "Keep me signed in" (`Checkbox` + `Text`):**
-   * *Evento:* `onCheckedChange = { viewModel.onKeepSignedInChange(it) }`
-   * *RF cubierto:* **RF-03: Persistencia de sesión prolongada.** Define si el Refresh Token se guarda en `EncryptedSharedPreferences` / DataStore para auto-login.
-5. **Enlace "Forgot password?" (`TextButton`):**
-   * *Evento:* `onClick = { navController.navigate(AuthDestinations.ForgotPassword) }`
-   * *RF cubierto:* **RF-04: Recuperación de credenciales.** Redirige al flujo de envío de correo de restablecimiento.
-6. **Botón Principal "SIGN IN ->" (`Button` solid lime `#CCFF00`):**
-   * *Evento:* `onClick = { viewModel.signIn() }`
-   * *RF cubierto:* **RF-05: Autenticación de usuario.** Envía credenciales al servicio de identidad. Deshabilita el botón durante la carga (`enabled = !uiState.isLoading`) y muestra `CircularProgressIndicator`. En éxito, navega a `VISTA-02`; en error, emite `SnackbarHostState.showSnackbar()`.
-7. **Enlace Secundario "Continue as Guest (Explore Map)" (`TextButton`):**
-   * *Evento:* `onClick = { viewModel.continueAsGuest(); navController.navigate(AppDestinations.MainMap) }`
-   * *RF cubierto:* **RF-06: Modo Explorador Invitado.** Inicializa sesión local anónima en Room/DataStore (`Role.GUEST`) permitiendo consulta de mapa sin token remoto.
+### 2. Componentes interactivos y trazabilidad
 
-### 4. Comportamiento en modo Offline
-* **Intento de Sign In:** Se intercepta con `NetworkMonitor`. Si no hay red, la petición HTTP se aborta inmediatamente sin loaders infinitos y se expone un `Snackbar`: *"Sin conexión a Internet. Conéctate a una red móvil o Wi-Fi para iniciar sesión"*.
-* **Acceso como Invitado:** Totalmente operativo. Permite acceder a `VISTA-02` aprovechando la base de datos local (Room) con los spots precacheados.
+1. **Campo `Email` (`OutlinedTextField`):**
+   - _Comportamiento:_ Valida formato de correo electrónico en tiempo real antes de habilitar el envío.
+   - _Requisito cubierto:_ **RF-01** (Registro e inicio de sesión).
+2. **Campo `Password` (`OutlinedTextField` con icono de visibilidad):**
+   - _Comportamiento:_ Oculta los caracteres por defecto (`PasswordVisualTransformation`) permitiendo alternar su visibilidad.
+   - _Requisito cubierto:_ **RF-01**, **RF-02** (Aislamiento y control de intentos fallidos en backend).
+3. **Botón principal `SIGN IN` (Color acento `#CCFF00`):**
+   - _Comportamiento:_ Envía las credenciales al endpoint de autenticación. Muestra un indicador de carga deshabilitando el botón mientras espera respuesta. Si el backend devuelve bloqueo temporal por 5 intentos fallidos, muestra el aviso correspondiente en un `Snackbar`.
+   - _Requisito cubierto:_ **RF-01**, **RF-02**.
+4. **Enlace secundario `Continue as Guest (Explore Map)` (`TextButton`):**
+   - _Comportamiento:_ Inicializa una sesión anónima local (`Role.GUEST`) y navega directamente a `VISTA-02` en modo solo lectura.
+   - _Requisito cubierto:_ **RF-03**, **RF-06**.
 
-### 5. Capturas a exportar de Figma
-* `FIG_VISTA01_LOGIN_DEFAULT.png`: Vista en estado inicial con placeholders y botón activo.
-* `FIG_VISTA01_LOGIN_ERROR.png`: Vista con borde de error en input email y mensaje de validación.
+### 3. Comportamiento en modo Offline
+
+- **Inicio de sesión:** Si no hay red, `NetworkMonitor` intercepta el intento antes de lanzar la petición HTTP y muestra el aviso _"Sin conexión a Internet. Conéctate para iniciar sesión"_.
+- **Acceso como Invitado:** Totalmente operativo; carga `VISTA-02` leyendo los _spots_ almacenados en la caché local de Room.
+
+### 4. Capturas de referencia (Figma)
+
+- `FIG_VISTA01_LOGIN_DEFAULT.png`: Estado inicial en modo oscuro (`#121214`) con el logotipo de SCO y botón activo.
+- `FIG_VISTA01_LOGIN_ERROR.png`: Estado de validación con aviso de error en credenciales.
 
 ---
 
-# VISTA-02: Mapa Principal y Explorador de Spots (Main Map & Explorer)
+## VISTA-02: Mapa Principal y Explorador (`Main Map & Explorer`)
 
-### 1. Nombre de la pantalla e ID
-`VISTA-02: Mapa Principal y Explorador de Spots (Main Map & Explorer)`
+### 1. Objetivo funcional y roles
 
-### 2. Objetivo funcional y roles de acceso
-* **Objetivo funcional:** Constituir el núcleo visual y operativo de la aplicación. Renderiza un mapa interactivo (Google Maps / Mapbox) con marcadores georreferenciados (pines) de spots de skate. Permite filtrar por tipología de terreno, buscar por nombre o zona geográfica, centrar en la ubicación del usuario mediante GPS y acceder al detalle de cada spot o a la creación de uno nuevo.
-* **Roles con acceso:**
-  * **Invitado (Guest):** Acceso de solo lectura al mapa, búsqueda y filtros. Si intenta pulsar el botón de crear spot (+), el sistema dispara un diálogo modal solicitando registro/login.
-  * **USER:** Acceso total (lectura del mapa, filtros, interacción con marcadores y creación de nuevos spots mediante el botón flotante).
-  * **ADMIN:** Acceso total, con indicador visual en pines de spots que están pendientes de moderación o reportados.
+- **Objetivo:** Pantalla principal de la aplicación. Renderiza el mapa vectorial oscuro con los _spots_ registrados, permite filtrar por tipo de obstáculo, buscar por nombre o zona y centrar la cámara en la posición GPS del usuario.
+- **Roles con acceso:**
+  - **Usuario Invitado:** Consulta del mapa, filtros y detalle de _spots_. Si pulsa el botón `+`, se muestra un diálogo solicitando iniciar sesión.
+  - **Skater (`USER`):** Acceso completo a exploración y alta de nuevos _spots_.
+  - **Moderador (`ADMIN`):** Acceso completo más acceso al panel de revisión de reportes (`VISTA-05`).
 
-### 3. Desglose de componentes interactivos
-1. **Lienzo del Mapa Interactivo (`GoogleMap` / `MarkerComposable` con Clustering):**
-   * *Evento:* `onMapClick = { viewModel.dismissSpotPreview() }`, `onMarkerClick = { spot -> viewModel.selectSpot(spot) }`, `onCameraMove = { cameraPosition -> viewModel.onViewportChanged(cameraPosition) }`
-   * *RF cubierto:* **RF-07: Renderizado Geoespacial y Agrupamiento (Clustering).** Despliega pines personalizados con icono de skate. Al tocar un pin individual, expande un card inferior (`SpotPreviewCard`). Al mover la cámara, actualiza la consulta de coordenadas (bounding box).
-2. **Barra de Búsqueda Superior (`DockedSearchBar` / `TextField` con icono de lupa):**
-   * *Evento:* `onQueryChange = { viewModel.searchSpots(it) }`, `onSearch = { viewModel.executeSearch() }`
-   * *RF cubierto:* **RF-08: Búsqueda Semántica de Spots.** Filtra por nombre, ciudad, barrio o características (ej. "Macedonia", "Plaza Colón", "manual pad"). Incluye debounce de 300ms.
-3. **Fila Horizontal de Chips de Filtro (`LazyRow` de `FilterChip`):**
-   * *Elementos:* Chips: `Todos`, `Skatepark`, `Street`, `Plaza / Ledge`, `Bowl`, `DIY`, `Cubierto (Indoor)`.
-   * *Evento:* `onClick = { viewModel.toggleFilter(filterType) }`
-   * *RF cubierto:* **RF-09: Filtrado por Tipología de Terreno.** Modifica la lista reactiva de marcadores en el mapa en base a las categorías seleccionadas (`Set<SpotCategory>`).
-4. **Botón Flotante "Mi Ubicación" (`FloatingActionButton` secundario con `Icons.Default.MyLocation`):**
-   * *Evento:* `onClick = { locationTracker.requestCurrentLocation { latLng -> cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(latLng, 15f)) } }`
-   * *RF cubierto:* **RF-10: Centrado GPS del Dispositivo.** Gestiona los permisos en tiempo de ejecución (`ACCESS_FINE_LOCATION`). Si están denegados, solicita permisos con `rememberLauncherForActivityResult`.
-5. **Tarjeta Inferior de Previsualización (`SpotPreviewCard` / `Card` deslizante animada):**
-   * *Elementos:* Miniatura de foto (`AsyncImage`), Nombre del spot, Distancia relativa (ej. "850 m"), Puntuación en estrellas (ej. "4.8 ★") y chips de etiquetas rápidas.
-   * *Evento:* `onClick = { navController.navigate("spot_detail/${spot.id}") }`
-   * *RF cubierto:* **RF-11: Vista Previa y Enrutamiento a Detalle.** Despliega información resumida antes de cargar la pantalla completa de detalle.
-6. **Botón Flotante de Acción Primaria "Añadir Spot" (`FloatingActionButton` en `#CCFF00` con `Icons.Default.Add`):**
-   * *Evento:* `onClick = { if (isGuest) showLoginRequiredDialog() else navController.navigate("create_spot") }`
-   * *RF cubierto:* **RF-12: Inicio de Registro de Nuevo Spot.** Abre el formulario de creación si el rol es USER o ADMIN. Si es Invitado, bloquea la acción y ofrece iniciar sesión.
+### 2. Componentes interactivos y trazabilidad
 
-### 4. Comportamiento en modo Offline
-* **Caché de Mapa y Teselas:** Si el dispositivo pierde la conexión, el mapa renderiza las teselas gráficas almacenadas en la caché local del SDK de mapas.
-* **Consulta de Spots Locales:** El repositorio de datos aplica la estrategia *Single Source of Truth* (SSOT): la UI consume `Flow<List<SpotEntity>>` desde Room Database. Todos los spots consultados previamente se muestran en el mapa sin degradación visual.
-* **Banner de Estado:** Se sobrepone un chip o barra superior atenuada: *"Modo sin conexión - Mostrando spots guardados localmente"*.
-* **Búsqueda restringida:** La barra de búsqueda ejecuta consultas locales mediante SQLite `LIKE %query%` sobre los spots cacheados, inhabilitando la geocodificación remota.
+1. **Lienzo Cartográfico (`MapLibre Native SDK` con teselas vectoriales OSM oscuras):**
+   - _Comportamiento:_ Al mover o hacer zoom en el mapa (con _debounce_ de 300 ms), solicita los _spots_ dentro del área visible (_Bounding Box_). Agrupa pines cercanos mediante _clustering_ dinámico según el nivel de zoom.
+   - _Requisito cubierto:_ **RF-03** (Carga espacial `GiST`), **RF-04** (Clustering).
+2. **Barra de Búsqueda Superior (`SearchBar`):**
+   - _Comportamiento:_ Filtra _spots_ por nombre o descripción tanto en servidor como en la caché local.
+   - _Requisito cubierto:_ **RF-03**.
+3. **Fila horizontal de Chips de Filtro (`LazyRow` de `FilterChip`):**
+   - _Elementos:_ `Todos`, `Escaleras`, `Barandilla`, `Bordillo / Cajón`, `Manual Pad`, `Plano Inclinado`, `Gap`, `Bowl` (sincronizados con la tabla `tipos_obstaculo`).
+   - _Comportamiento:_ Filtra reactivamente los marcadores visibles en el mapa para mostrar solo _spots_ que contengan los obstáculos seleccionados.
+   - _Requisito cubierto:_ **RF-05** (Filtrado por tipo de obstáculo).
+4. **Botón flotante `Mi Ubicación` (`FloatingActionButton` secundario):**
+   - _Comportamiento:_ Solicita permiso `ACCESS_FINE_LOCATION` y centra la cámara en las coordenadas GPS actuales.
+   - _Requisito cubierto:_ **RF-03**.
+5. **Tarjeta inferior de vista previa (`SpotPreviewCard`):**
+   - _Comportamiento:_ Se despliega al tocar un pin individual. Muestra foto en miniatura, nombre del _spot_, estado de verificación y etiquetas de obstáculos. Al pulsarla abre `VISTA-03`.
+   - _Requisito cubierto:_ **RF-06** (Consulta de detalle).
+6. **Botón flotante principal `+ Añadir Spot` (`FAB` en `#CCFF00`):**
+   - _Comportamiento:_ Abre `VISTA-04` para usuarios autenticados o lanza el aviso de inicio de sesión para invitados.
+   - _Requisito cubierto:_ **RF-07**.
 
-### 5. Capturas a exportar de Figma
-* `FIG_VISTA02_MAP_OVERVIEW.png`: Vista completa con el mapa oscuro, pines verdes de spots y chips de filtro superiores.
-* `FIG_VISTA02_MAP_SPOT_SELECTED.png`: Vista con un pin seleccionado y la tarjeta inferior `SpotPreviewCard` desplegada.
+### 3. Comportamiento en modo Offline
+
+- La UI observa `Flow<List<SpotEntity>>` desde **Room** (_Single Source of Truth_). Si no hay cobertura, el mapa muestra todos los _spots_ cacheados previamente junto a las teselas almacenadas en disco y un indicador superior discreto (_"Modo sin conexión"_).
+
+### 4. Capturas de referencia (Figma)
+
+- `FIG_VISTA02_MAP_OVERVIEW.png`: Mapa oscuro con clustering, chips de obstáculos y botón `+`.
+- `FIG_VISTA02_MAP_SPOT_SELECTED.png`: Mapa con pin seleccionado y tarjeta inferior desplegada.
 
 ---
 
-# VISTA-03: Detalle del Spot (Spot Detail View)
+## VISTA-03: Ficha Técnica del Spot (`Spot Detail Bottom Sheet / View`)
 
-### 1. Nombre de la pantalla e ID
-`VISTA-03: Detalle del Spot (Spot Detail View)`
+### 1. Objetivo funcional y roles
 
-### 2. Objetivo funcional y roles de acceso
-* **Objetivo funcional:** Ofrecer la ficha técnica completa y multimedia de un skate spot específico. Presenta una galería fotográfica/vídeo, descripción del terreno (calidad del suelo, nivel de seguridad/iluminación, presencia de seguridad/policía), lista detallada de obstáculos (rails, ledges, stairs, gaps), puntuaciones de la comunidad, botón de navegación paso a paso externa (Google Maps) y acciones de interacción (guardar en favoritos, valorar o reportar).
-* **Roles con acceso:**
-  * **Invitado (Guest):** Puede ver toda la información, galería, mapa y reseñas. Si pulsa "Guardar en favoritos" o "Dejar Reseña", se le solicita login.
-  * **USER:** Acceso total. Puede marcar/desmarcar favoritos, subir fotos adicionales, valorar el spot y emitir reportes.
-  * **ADMIN:** Acceso total con controles adicionales: botón de "Editar Spot", "Ocultar Spot" o "Aprobar Moderación".
+- **Objetivo:** Mostrar la ficha completa de un _spot_ seleccionado: galería fotográfica en WebP, estado del suelo, inventario detallado de obstáculos físicos (`obstaculos_spot`), contador de validaciones comunitarias y acciones de verificación o reporte.
+- **Roles con acceso:**
+  - **Usuario Invitado:** Lectura completa de la ficha y botón de navegación externa. Los botones de validar o reportar piden autenticación.
+  - **Skater (`USER`):** Puede validar el _spot_ por proximidad GPS, guardarlo en favoritos o reportarlo.
+  - **Moderador (`ADMIN`):** Además de las acciones de usuario, dispone de controles rápidos para aprobar o archivar el _spot_.
 
-### 3. Desglose de componentes interactivos
-1. **Carrusel de Imágenes y Vídeos de Cabecera (`HorizontalPager` con indicador de puntos):**
-   * *Evento:* Deslizamiento táctil horizontal (`scroll`). Click en imagen para abrir visor a pantalla completa con zoom (`ZoomableImageModal`).
-   * *RF cubierto:* **RF-13: Inspección Multimedia del Spot.** Carga imágenes optimizadas con Coil (`AsyncImage`) mostrando placeholder de esqueleto (*shimmer*).
-2. **Botón Flotante "Favorito / Guardar" (`FilledIconButton` circular con `Icons.Default.Bookmark` o `Favorite`):**
-   * *Evento:* `onClick = { viewModel.toggleFavorite(spotId) }`
-   * *RF cubierto:* **RF-14: Gestión de Spots Guardados.** Actualiza inmediatamente la UI de forma optimista. Si es Invitado, lanza diálogo de autenticación requerida.
-3. **Botón de Acción "Cómo llegar / Abrir en Navegador" (`Button` primario con icono de navegación):**
-   * *Evento:* `onClick = { val intent = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=${spot.lat},${spot.lng}")); context.startActivity(intent) }`
-   * *RF cubierto:* **RF-15: Enrutamiento Externo GPS.** Lanza un intent implícito a Google Maps, Waze o app de transporte instalada.
-4. **Matriz de Badges de Obstáculos y Terreno (`FlowRow` de `AssistChip` / `SuggestionChip`):**
-   * *Elementos:* Chips: `Suelo: Mármol liso`, `Bordillos encerados`, `Escaleras 5-set`, `Barandilla redonda`, `Iluminación nocturna: Sí`, `Bust / Policía: Bajo`.
-   * *Evento:* No disparan evento destructivo; tooltip informativo al mantener pulsado.
-   * *RF cubierto:* **RF-16: Ficha Técnica de Obstáculos.** Permite al skater evaluar si el spot se adapta a su nivel técnico o modalidad de patinaje.
-5. **Sección de Valoraciones y Reseñas Comunitarias (`LazyColumn` anidado con botón "Añadir Opinión"):**
-   * *Evento:* `onClick = { viewModel.openAddReviewDialog() }`
-   * *RF cubierto:* **RF-17: Sistema de Reseñas y Puntuación.** Despliega diálogo modal con selector de 1 a 5 estrellas, campo de texto y tags de estado actual del spot (ej. *"Suelo mojado"*, *"Bordillo roto"*).
-6. **Botón Secundario de Opciones / Menú Tres Puntos (`DropdownMenu`):**
-   * *Evento:* Opciones: *"Compartir spot"*, *"Reportar problema / Spot destruido"*, *(Solo ADMIN)* *"Editar atributos"*.
-   * *RF cubierto:* **RF-18: Moderación Comunitaria y Difusión.** Dispara el `ShareCompat.IntentBuilder` del sistema o el formulario de reporte de moderación.
+### 2. Componentes interactivos y trazabilidad
 
-### 4. Comportamiento en modo Offline
-* **Disponibilidad:** Si el spot fue visitado previamente o guardado en favoritos, toda la ficha técnica (textos, coordenadas, especificaciones) se carga desde Room.
-* **Imágenes cacheadas:** Coil sirve las imágenes almacenadas en el disco local (`DiskCache`). Las fotos no descargadas muestran un icono de fallo amigable con aviso de falta de conexión.
-* **Mutaciones sin red (Favoritos):** El botón "Favorito" soporta *Optimistic UI*: la base de datos local actualiza el flag `isFavorite = true` y encola una tarea en `WorkManager` con `Constraints(NetworkType.CONNECTED)` para sincronizar la llamada POST/DELETE al recuperar cobertura.
-* **Navegación GPS:** El botón "Cómo llegar" sigue operativo porque las coordenadas locales se envían a la app externa de mapas.
+1. **Galería de Fotografías (`HorizontalPager` + visor ampliable):**
+   - _Comportamiento:_ Carga las imágenes WebP almacenadas en Object Storage mediante Coil con caché en disco.
+   - _Requisito cubierto:_ **RF-06**.
+2. **Desglose de Obstáculos y Terreno (`FlowRow` de etiquetas):**
+   - _Comportamiento:_ Muestra el estado del suelo (`LISO`, `RUGOSO`, `AGRIETADO`) y cada elemento físico registrado en `obstaculos_spot` junto a su detalle (ej. _"Barandilla — Redonda de 6 escalones"_).
+   - _Requisito cubierto:_ **RF-06**.
+3. **Botón primario `Validar Spot (GPS)` (`Button` en `#CCFF00`):**
+   - _Comportamiento:_ Comprueba en el dispositivo que la ubicación no procede de un proveedor simulado (`isFromMockProvider`) y envía las coordenadas al backend, donde `ST_DWithin` verifica que el skater está a menos de 100 metros del _spot_. Limita a 1 voto por usuario y _spot_.
+   - _Requisito cubierto:_ **RF-11** (Validación comunitaria anti-spoofing).
+4. **Botón `Cómo llegar` (`OutlinedButton`):**
+   - _Comportamiento:_ Lanza un `Intent` implicito (`geo:lat,lng`) para abrir la ubicación en la app de navegación externa instalada en el teléfono.
+   - _Requisito cubierto:_ **RF-06**.
+5. **Botón `Reportar` (`IconButton` / menú contextual):**
+   - _Comportamiento:_ Permite marcar un _spot_ como duplicado, inexistente o destruido para su revisión por moderadores.
+   - _Requisito cubierto:_ **RF-12**.
 
-### 5. Capturas a exportar de Figma
-* `FIG_VISTA03_SPOT_DETAIL_MAIN.png`: Parte superior con carrusel de fotos, título, badges de suelo y botón "Cómo llegar".
-* `FIG_VISTA03_SPOT_DETAIL_REVIEWS.png`: Scroll inferior con la sección de comentarios, estrellas de valoración y ficha técnica de obstáculos.
+### 3. Comportamiento en modo Offline
+
+- Si el _spot_ está cacheado en Room, toda su información y fotografías descargadas se muestran sin conexión.
+- El botón `Validar Spot (GPS)` queda deshabilitado con un aviso explicativo cuando no hay red, ya que la verificación de proximidad (`ST_DWithin`) y el control de voto único requieren validación transaccional en el servidor.
+
+### 4. Capturas de referencia (Figma)
+
+- `FIG_VISTA03_SPOT_DETAIL_MAIN.png`: Ficha desplegada con fotografía, etiquetas de obstáculos y botón de validación GPS.
 
 ---
 
-# VISTA-04: Registrar / Añadir Nuevo Spot (Create Spot Form)
+## VISTA-04: Crear Nuevo Spot (`Create Spot Form`)
 
-### 1. Nombre de la pantalla e ID
-`VISTA-04: Registrar / Añadir Nuevo Spot (Create Spot Form)`
+### 1. Objetivo funcional y roles
 
-### 2. Objetivo funcional y roles de acceso
-* **Objetivo funcional:** Permitir a los miembros de la comunidad registrar y mapear un nuevo skate spot no catalogado. Incluye captura/subida de evidencias fotográficas, fijación milimétrica de coordenadas sobre un mini-mapa interactivo, tipificación de obstáculos, calidad del suelo y advertencias de seguridad para el resto de patinadores.
-* **Roles con acceso:**
-  * **Invitado (Guest):** Acceso bloqueado. Esta vista requiere obligatoriamente sesión activa para asociar la autoría del spot a un usuario.
-  * **USER:** Acceso estándar. Los spots registrados por usuarios quedan en estado `PENDING_REVIEW` o se publican directamente con marca comunitaria.
-  * **ADMIN:** Acceso con privilegios de aprobación inmediata (`STATUS_VERIFIED`) y asignación de tags especiales (Spot Oficial / Skatepark Municipal).
+- **Objetivo:** Permitir a los skaters catalogar un nuevo _spot_ urbano adjuntando fotografías validadas localmente, fijando su posición exacta en el mapa y añadiendo uno o varios obstáculos físicos reales.
+- **Roles con acceso:** Exclusivo para **Skater (`USER`)** y **Moderador (`ADMIN`)**.
 
-### 3. Desglose de componentes interactivos
-1. **Selector de Imágenes / Media Picker (`Card` punteada con icono de cámara y botón "+ Añadir Fotos"):**
-   * *Evento:* `onClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }`
-   * *RF cubierto:* **RF-19: Carga de Archivos Multimedia.** Soporta el `PhotoPicker` moderno de Android (sin permisos invasivos de galería). Permite seleccionar hasta 5 fotos y reordenarlas o eliminarlas mediante icono de cruz (`x`).
-2. **Campo de Texto "Nombre del Spot" (`OutlinedTextField`):**
-   * *Evento:* `onValueChange = { viewModel.onSpotNameChange(it) }`
-   * *RF cubierto:* **RF-20: Nomenclatura del Spot.** Campo obligatorio (mínimo 3 caracteres, máximo 50).
-3. **Mini-Selector de Ubicación con Pin (`Box` con vista estática de mapa y botón "Ajustar en mapa"):**
-   * *Evento:* `onClick = { viewModel.openLocationPickerMap() }`
-   * *RF cubierto:* **RF-21: Georreferenciación Precisa.** Por defecto toma la ubicación GPS actual del dispositivo (`lat`, `lng`). Al pulsar, abre un mapa modal a pantalla completa con retícula central para ajustar el punto exacto.
-4. **Selector de Categoría Principal (`ExposedDropdownMenuBox`):**
-   * *Elementos:* Opciones: `Plaza / Calle`, `Skatepark`, `DIY (Hecho a mano)`, `Bowl / Rampa`, `Downhill / Cuesta`.
-   * *Evento:* `onOptionSelected = { viewModel.selectCategory(it) }`
-   * *RF cubierto:* **RF-22: Categorización Estructural.** Asigna la taxonomía base del spot.
-5. **Selector Múltiple de Obstáculos Disponibles (`LazyRow` / `FlowRow` con `FilterChip` seleccionables):**
-   * *Elementos:* Chips: `Bordillo (Ledge)`, `Barandilla plana`, `Barandilla bajada (Handrail)`, `Escaleras`, `Manual Pad`, `Pirámide`, `Wallride`, `Transición / Quarter`.
-   * *Evento:* `onClick = { viewModel.toggleObstacle(obstacleId) }`
-   * *RF cubierto:* **RF-23: Etiquetado de Elementos Patinables.** Permite selección múltiple de los elementos reales del lugar.
-6. **Slider de Nivel de "Bust" / Seguridad Policial (`Slider` de 1 a 5 con indicador de color):**
-   * *Evento:* `onValueChange = { viewModel.setBustLevel(it) }`
-   * *RF cubierto:* **RF-24: Nivel de Tolerancia Policial / Seguridad privada.** 1 = Spot libre/sin problemas (Verde), 3 = Te echan tras un rato (Ámbar), 5 = Multa inmediata o seguridad agresiva (Rojo).
-7. **Botón Principal "PUBLICAR SPOT" (`Button` solid lime `#CCFF00` con texto Black Bold):**
-   * *Evento:* `onClick = { viewModel.submitSpot() }`
-   * *RF cubierto:* **RF-25: Envío y Validación del Formulario.** Valida que existan: al menos 1 foto, nombre válido, categoría y coordenadas. Si faltan datos, activa `isError = true` en los campos correspondientes. Si es válido, sube imágenes a almacenamiento (Cloud Storage / S3) y registra el registro en la API.
+### 2. Componentes interactivos y trazabilidad
 
-### 4. Comportamiento en modo Offline
-* **Borrador Local (Draft Auto-Save):** Toda la información introducida se almacena automáticamente en Room bajo un registro de tipo `SpotDraftEntity`. Si la app se cierra o pierde la red durante la edición, el skater no pierde sus datos.
-* **Cola de Publicación Diferida:** Si el usuario pulsa "PUBLICAR SPOT" sin cobertura:
-  1. La app almacena las fotos comprimidas en el almacenamiento interno de la app (`context.filesDir`).
-  2. Encola un `OneTimeWorkRequest` en `WorkManager` con restricción de red requerida.
-  3. Muestra una notificación local al usuario: *"Spot guardado localmente. Se publicará automáticamente en cuanto recuperes conexión"*.
-  4. Redirige al mapa mostrando el nuevo spot con un indicador visual de *"Pendiente de sincronizar"*.
+1. **Selector Fotográfico con Escaneo Edge AI (`PhotoPicker` + `LiteRT / MediaPipe`):**
+   - _Comportamiento:_ Permite seleccionar o capturar hasta 3 fotografías. Antes de aceptar la imagen, el modelo local **LiteRT** la analiza en segundo plano para confirmar que muestra mobiliario urbano o exterior, descartando imágenes en negro o _spam_ visual. Tras pasar el filtro, la imagen se submuestrea (`inSampleSize`), se comprime a **WebP** y se eliminan sus metadatos **EXIF**.
+   - _Requisito cubierto:_ **RF-09** (Compresión WebP y limpieza EXIF), **RF-10** (Filtro Edge AI on-device).
+2. **Campos `Nombre del Spot` y `Descripción` (`OutlinedTextField`):**
+   - _Comportamiento:_ Validación de longitud mínima y máxima antes de permitir el guardado.
+   - _Requisito cubierto:_ **RF-07**.
+3. **Selector de Ubicación GPS (`MiniMap` con marcador ajustable):**
+   - _Comportamiento:_ Toma las coordenadas actuales del dispositivo (bloqueando _Mock Locations_) y permite ajustar ligeramente el pin sobre el callejero.
+   - _Requisito cubierto:_ **RF-07**.
+4. **Selector de Estado del Suelo (`SegmentedButton`):**
+   - _Elementos:_ `Liso`, `Rugoso`, `Agrietado` (mapeado al campo `estado_suelo`).
+   - _Requisito cubierto:_ **RF-07**.
+5. **Constructor de Obstáculos Físicos (`tipos_obstaculo` + nota breve):**
+   - _Comportamiento:_ Permite añadir uno o varios elementos físicos al _spot_ seleccionando su tipo del catálogo (`Escaleras`, `Barandilla`, `Bordillo`, etc.) y añadiendo un detalle opcional (ej. _"8 escalones"_).
+   - _Requisito cubierto:_ **RF-07**.
+6. **Botón primario `GUARDAR SPOT` (`Button` en `#CCFF00`):**
+   - _Comportamiento:_ Guarda el registro en Room, solicita la URL prefirmada al backend, sube la imagen WebP directamente a Object Storage y registra el _spot_ en PostgreSQL.
+   - _Requisito cubierto:_ **RF-07**, **RF-08**, **RF-09**.
 
-### 5. Capturas a exportar de Figma
-* `FIG_VISTA04_CREATE_FORM_TOP.png`: Sección superior con contenedor de carga de fotos, nombre del spot y selector de categoría.
-* `FIG_VISTA04_CREATE_FORM_OBSTACLES.png`: Sección inferior con chips de selección de obstáculos, slider de bust y botón "PUBLICAR SPOT".
+### 3. Comportamiento en modo Offline
+
+- **Flujo Offline-First nativo:** Si no hay cobertura móvil en la calle al pulsar `GUARDAR SPOT`, la app guarda los datos en Room con estado `PENDIENTE_SYNC`, almacena los archivos WebP en `context.filesDir` y encola un trabajo en **WorkManager** (`NetworkType.CONNECTED`). El _spot_ aparece de inmediato en el mapa local del usuario con un icono de sincronización pendiente y se sube automáticamente en segundo plano al recuperar la conexión (**RF-08**).
+
+### 4. Capturas de referencia (Figma)
+
+- `FIG_VISTA04_CREATE_FORM.png`: Formulario completo en modo oscuro con selector de foto, chips de obstáculos y botón de guardado.
 
 ---
 
-# VISTA-05: Perfil del Skater y Spots Guardados (Profile & Bookmarks)
+## VISTA-05: Perfil y Panel de Moderación (`Profile & Admin Panel`)
 
-### 1. Nombre de la pantalla e ID
-`VISTA-05: Perfil del Skater y Spots Guardados (Profile & Bookmarks)`
+### 1. Objetivo funcional y roles
 
-### 2. Objetivo funcional y roles de acceso
-* **Objetivo funcional:** Ofrecer el panel personal del usuario. Muestra el avatar del skater, nombre de usuario, reputación dentro de la comunidad (puntos SCO por spots añadidos y votos recibidos), pestañas organizadas para acceder a spots guardados en favoritos, spots creados por el usuario y configuración de la cuenta (edición de perfil, preferencias de notificaciones y cierre de sesión).
-* **Roles con acceso:**
-  * **Invitado (Guest):** La vista muestra un estado de llamada a la acción (*Login CTA State*): un banner explicativo *"Crea una cuenta o inicia sesión para guardar spots favoritos y registrar tus descubrimientos"* con botones hacia `VISTA-01`.
-  * **USER:** Acceso a su propio perfil y listas de spots.
-  * **ADMIN:** Acceso a su perfil, con insignia visible *"ADMINISTRADOR"* y acceso a una sección de *"Panel de Moderación de Spots"*.
+- **Objetivo:** Mostrar la información básica del usuario, sus _spots_ creados o guardados y el cierre de sesión. Si el token JWT incluye el rol `ADMIN`, habilita la pestaña de moderación comunitaria.
+- **Roles con acceso:**
+  - **Usuario Invitado:** Muestra una tarjeta informativa invitando a iniciar sesión (`VISTA-01`).
+  - **Skater (`USER`):** Muestra sus _spots_ registrados, guardados y botón de cerrar sesión.
+  - **Moderador (`ADMIN`):** Desbloquea la pestaña **Moderación** para auditar _spots_ reportados y gestionar el catálogo `tipos_obstaculo`.
 
-### 3. Desglose de componentes interactivos
-1. **Cabecera de Perfil (Avatar `AsyncImage` circular + Botón Editar):**
-   * *Evento:* `onClick = { navController.navigate("profile/edit") }`
-   * *RF cubierto:* **RF-26: Visualización y Edición de Identidad.** Muestra imagen de perfil, biografía corta, stance (Goofy/Regular) y ciudad base.
-2. **Contador de Estadísticas del Skater (`Row` con 3 métricas clave):**
-   * *Elementos:* `[ Spots Creados ]`, `[ Favoritos ]`, `[ Nivel de Reputación / Puntos ]`.
-   * *Evento:* Click en cada métrica filtra directamente la pestaña correspondiente inferior.
-   * *RF cubierto:* **RF-27: Métricas de Contribución Comunitaria.** Incentiva el mapeo colaborativo mediante gamificación.
-3. **Pestañas de Navegación de Listas (`TabRow` con `Tab` interactivos):**
-   * *Elementos:* Tab 1: *"Guardados / Favoritos"*, Tab 2: *"Mis Spots Registrados"*, Tab 3 *(Solo ADMIN)*: *"Pendientes de Aprobación"*.
-   * *Evento:* `onClick = { viewModel.selectTab(index) }`
-   * *RF cubierto:* **RF-28: Segmentación de Contenido Personal.** Alterna la vista entre la colección de spots guardados para futuras sesiones y los spots subidos por el propio usuario.
-4. **Lista Vertical de Spots (`LazyColumn` con tarjetas `SpotSummaryCard`):**
-   * *Elementos:* Cada tarjeta contiene: foto, nombre, tipo de obstáculo principal, distancia y botón rápido de eliminar de favoritos (`IconButton` papelera o bookmark relleno).
-   * *Evento:* Click en la tarjeta navega a `VISTA-03: Detalle del Spot`. Click en el icono de favorito dispara eliminación inmediata con opción de deshacer en `Snackbar`.
-   * *RF cubierto:* **RF-29: Gestión de Listas de Spots.** Renderizado optimizado con reciclaje de vistas (`key = { spot.id }`).
-5. **Botón de Ajustes y Cerrar Sesión (`IconButton` con engranaje en TopAppBar y botón "Cerrar Sesión"):**
-   * *Evento:* `onClick = { viewModel.signOut(); navController.navigate("auth/login") { popUpTo(0) } }`
-   * *RF cubierto:* **RF-30: Gestión de Sesión y Logout.** Revoca el token local en DataStore, borra credenciales en caché y limpia el backstack de navegación.
+### 2. Componentes interactivos y trazabilidad
 
-### 4. Comportamiento en modo Offline
-* **Spots Guardados Accesibles:** Los spots de la pestaña "Favoritos" se almacenan permanentemente en la base de datos local de Room. El skater puede consultar sus spots preferidos en cualquier momento en medio de la calle sin necesidad de conexión de datos.
-* **Modo degradado de perfil:** Se muestran los datos del perfil cacheados de la última sincronización. Si el usuario intenta editar su biografía o cambiar su avatar sin red, se bloquea la acción con un mensaje emergente avisando de que los cambios de perfil requieren conexión activa.
+1. **Pestañas de contenido (`TabRow`):**
+   - _Elementos:_ `Mis Spots` | `Guardados` | `Moderación (Solo ADMIN)`.
+   - _Requisito cubierto:_ **RF-01**, **RF-12**.
+2. **Lista de Moderación (`LazyColumn` visible solo para `ADMIN`):**
+   - _Comportamiento:_ Lista los _spots_ en estado `PENDIENTE` o reportados por usuarios. Cada tarjeta incluye dos acciones rápidas: **Aprobar** (cambia estado a `PUBLICADO`) y **Archivar** (cambia estado a `ARCHIVADO` ocultándolo del mapa público).
+   - _Requisito cubierto:_ **RF-12** (Panel de moderación).
+3. **Gestión de Catálogo (`Añadir tipo de obstáculo`, solo `ADMIN`):**
+   - _Comportamiento:_ Formulario breve para insertar nuevas categorías en `tipos_obstaculo`.
+   - _Requisito cubierto:_ **RF-12**.
+4. **Botón `Cerrar Sesión` (`OutlinedButton`):**
+   - _Comportamiento:_ Elimina el token JWT almacenado localmente y redirige a `VISTA-01`.
+   - _Requisito cubierto:_ **RF-01**.
 
-### 5. Capturas a exportar de Figma
-* `FIG_VISTA05_PROFILE_BOOKMARKS.png`: Cabecera con avatar, métricas y pestaña activa "Guardados" mostrando la lista de spots.
-* `FIG_VISTA05_PROFILE_GUEST_STATE.png`: Estado alternativo para rol Invitado mostrando la pantalla de invitación al registro.
+### 3. Comportamiento en modo Offline
+
+- Las listas de `Mis Spots` y `Guardados` se consultan directamente desde Room.
+- Las acciones administrativas de moderación (`Aprobar` / `Archivar`) y la edición del catálogo requieren conexión activa para mantener la consistencia en PostgreSQL.
+
+### 4. Capturas de referencia (Figma)
+
+- `FIG_VISTA05_ADMIN_MODERATION.png`: Vista de moderación con tarjetas de _spots_ reportados y botones de aprobar/archivar.
