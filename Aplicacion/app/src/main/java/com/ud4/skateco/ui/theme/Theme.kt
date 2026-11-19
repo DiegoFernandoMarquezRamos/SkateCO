@@ -1,4 +1,4 @@
-package com.skateco.sco.ui.theme
+package com.ud4.skateco.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -37,3 +37,12 @@ fun SCOTheme(
         content = content
     )
 }
+
+@Composable
+fun SkateCOTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    SCOTheme(darkTheme = darkTheme, content = content)
+}
+

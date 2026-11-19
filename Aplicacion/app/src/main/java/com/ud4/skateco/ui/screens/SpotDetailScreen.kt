@@ -1,4 +1,4 @@
-package com.skateco.sco.ui.screens
+package com.ud4.skateco.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -28,7 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.skateco.sco.ui.theme.*
+import com.ud4.skateco.ui.theme.*
 
 // Modelo Mock detallado del Spot según base_de_datos_SCO.sql
 data class MockSpotDetail(

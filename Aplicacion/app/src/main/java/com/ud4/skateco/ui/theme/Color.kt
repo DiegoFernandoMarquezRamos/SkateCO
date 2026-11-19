@@ -1,4 +1,4 @@
-package com.skateco.sco.ui.theme
+package com.ud4.skateco.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
