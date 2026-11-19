@@ -1,0 +1,69 @@
+# ==========================================
+# Archivos de Sistema Operativo
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==========================================
+# Entornos de desarrollo / IDEs
+# ==========================================
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# ==========================================
+# Gradle & Compilación Android
+# ==========================================
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+profile/
+
+# Archivos compilados y empaquetados Android
+*.apk
+*.aar
+*.ap_
+*.aab
+*.dex
+*.class
+
+# Configuración local de la máquina (Rutas SDK de Android)
+local.properties
+**/local.properties
+
+# Propiedades del daemon de Gradle generadas localmente
+gradle-daemon-jvm.properties
+
+# ==========================================
+# Seguridad y Firmas (Keystores / Secretos)
+# ==========================================
+*.keystore
+*.jks
+*.key
+google-services.json
+
+# ==========================================
+# Archivos Temporales y Logs
+# ==========================================
+*.log
+*.tmp
+*.bak
+*.swp
+*~
