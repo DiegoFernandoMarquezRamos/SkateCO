@@ -29,6 +29,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ud4.skateco.ui.theme.*
+import com.ud4.skateco.UserRole
 
 // Modelos Mock para Perfil y Moderación
 data class MockReportItem(
@@ -55,11 +56,16 @@ data class MockUserSpot(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileAdminScreen(
+    role: UserRole = UserRole.GUEST,
     onSignOutClick: () -> Unit = {},
     onSpotClick: (String) -> Unit = {}
 ) {
-    var selectedTabIndex by rememberSaveable { mutableStateOf(2) } // Por defecto en Moderación Admin para mostrar la funcionalidad completa
-    val tabs = listOf("Mis Spots (2)", "Guardados (5)", "Moderación Admin (2)")
+    var selectedTabIndex by rememberSaveable(role) { mutableStateOf(0) }
+    val tabs = if (role == UserRole.ADMIN) {
+        listOf("Mis Spots (2)", "Guardados (5)", "Moderación Admin (2)")
+    } else {
+        listOf("Mis Spots (2)", "Guardados (5)")
+    }
 
     // Lista mockeada de reportes pendientes de moderación (ADMIN)
     val reportsList = remember {
@@ -163,7 +169,7 @@ fun ProfileAdminScreen(
                                     fontWeight = FontWeight.Black
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                // Badge Rol ADMIN
+                                // Badge de rol obtenido del servidor
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
                                     color = UrethaneLime,
@@ -180,7 +186,7 @@ fun ProfileAdminScreen(
                                         )
                                         Spacer(modifier = Modifier.width(2.dp))
                                         Text(
-                                            text = "ADMIN",
+                                            text = role.name,
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Black,
                                             fontSize = 9.sp
@@ -190,7 +196,7 @@ fun ProfileAdminScreen(
                             }
 
                             Text(
-                                text = "yodiegojr@gmail.com • Madrid Centro",
+                                text = if (role == UserRole.GUEST) "Acceso invitado" else "Usuario verificado",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextMuted
                             )
@@ -250,6 +256,9 @@ fun ProfileAdminScreen(
             // 3. Contenido de la Pestaña Seleccionada
             when (selectedTabIndex) {
                 2 -> {
+                    if (role != UserRole.ADMIN) {
+                        Box(modifier = Modifier.fillMaxSize())
+                    } else {
                     // Pestaña de Moderación ADMIN con Tarjetas de Reportes
                     LazyColumn(
                         modifier = Modifier

@@ -1,0 +1,25 @@
+name: Android CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Grant execute permission
+        run: chmod +x Aplicacion/gradlew
+      - name: Run unit tests
+        working-directory: Aplicacion
+        run: ./gradlew test
