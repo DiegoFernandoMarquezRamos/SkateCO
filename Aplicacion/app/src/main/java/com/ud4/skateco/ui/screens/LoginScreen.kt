@@ -40,7 +40,7 @@ fun LoginScreen(
     onForgotPasswordClick: () -> Unit = {}
 ) {
     var email by rememberSaveable { mutableStateOf("skater@email.com") }
-    var password by rememberSaveable { mutableStateOf("••••••••") }
+    var password by rememberSaveable { mutableStateOf("") }
     var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
     var keepSignedIn by rememberSaveable { mutableStateOf(true) }
 
@@ -231,6 +231,7 @@ fun LoginScreen(
                     // Botón Principal Sign In
                     Button(
                         onClick = { onSignInClick(email, password) },
+                        enabled = false,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),

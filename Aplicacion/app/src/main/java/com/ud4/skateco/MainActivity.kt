@@ -36,6 +36,8 @@ import com.ud4.skateco.ui.theme.TextMuted
 import com.ud4.skateco.ui.theme.UrethaneLime
 import kotlinx.serialization.Serializable
 
+enum class UserRole { GUEST, USER, ADMIN }
+
 // ── Rutas de navegación ──────────────────────────────────────
 @Serializable object LoginRoute
 @Serializable object MapRoute
@@ -70,6 +72,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SkateCOApp() {
     val navController = rememberNavController()
+    var userRole by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(UserRole.GUEST) }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
@@ -124,11 +127,11 @@ fun SkateCOApp() {
             composable<LoginRoute> {
                 LoginScreen(
                     onSignInClick = { _, _ ->
-                        navController.navigate(MapRoute) {
-                            popUpTo(LoginRoute) { inclusive = true }
-                        }
+                        // Authentication requires a verified backend session. A local UI login
+                        // must never grant an application role.
                     },
                     onContinueAsGuestClick = {
+                        userRole = UserRole.GUEST
                         navController.navigate(MapRoute) {
                             popUpTo(LoginRoute) { inclusive = true }
                         }
@@ -143,7 +146,9 @@ fun SkateCOApp() {
                         navController.navigate(SpotDetailRoute(spotId))
                     },
                     onCreateSpotClick = {
-                        navController.navigate(CreateSpotRoute)
+                        if (userRole == UserRole.USER || userRole == UserRole.ADMIN) {
+                            navController.navigate(CreateSpotRoute)
+                        }
                     },
                     onProfileClick = {
                         navController.navigate(ProfileRoute) {
@@ -179,6 +184,7 @@ fun SkateCOApp() {
             // 5️⃣ Perfil y Administración
             composable<ProfileRoute> {
                 ProfileAdminScreen(
+                    role = userRole,
                     onSignOutClick = {
                         navController.navigate(LoginRoute) {
                             popUpTo(0) { inclusive = true }
