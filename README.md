@@ -33,6 +33,20 @@ Una aplicación Android para explorar y documentar lugares aptos para skate y ot
 - Esquema SQL inicial con PostgreSQL/PostGIS y datos de ejemplo para Madrid.
 - CI en GitHub Actions que ejecuta los tests Android.
 
+## Diseño de Interfaz (Figma)
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><img src="docs/image/Frame.png" width="160" alt="Pantalla Login" /></td>
+    <td align="center"><img src="docs/image/Frame-1.png" width="160" alt="Mapa de Spots" /></td>
+    <td align="center"><img src="docs/image/Frame-2.png" width="160" alt="Detalle de Spot" /></td>
+    <td align="center"><img src="docs/image/Frame-3.png" width="160" alt="Alta de Spot" /></td>
+    <td align="center"><img src="docs/image/Frame-4.png" width="160" alt="Perfil y Moderación" /></td>
+  </tr>
+</table>
+</div>
+
 ## Stack actual
 
 | Área | Tecnología |
@@ -42,9 +56,23 @@ Una aplicación Android para explorar y documentar lugares aptos para skate y ot
 | Modelo de datos inicial | PostgreSQL, PostGIS, SQL |
 | Calidad | Gradle, JUnit, GitHub Actions |
 
-### Arquitectura prevista
+### Arquitectura prevista y Modelo de Datos
 
-El anteproyecto contempla un backend con Spring Boot y Java, además de funcionalidades offline-first y servicios geoespaciales. Son objetivos de desarrollo, no componentes ya integrados en esta versión.
+El anteproyecto contempla un backend con Spring Boot y Java, además de funcionalidades *offline-first* y servicios geoespaciales. Son objetivos de desarrollo, no componentes ya integrados en esta versión.
+
+<details>
+<summary><b>Ver diagramas de Arquitectura y Esquema PostgreSQL / PostGIS</b></summary>
+<br/>
+<div align="center">
+  <p><b>Arquitectura del Sistema</b></p>
+  <img src="docs/image/Diagramas%20Tecnicos-Diagrama%20de%20Arquitectura%20del%20Sistema.png" width="85%" alt="Diagrama de Arquitectura del Sistema" />
+  <br/><br/>
+  <p><b>Modelo Relacional (PostgreSQL + PostGIS)</b></p>
+  <img src="docs/image/supabase-schema-xcwxgqujgjcjiojolidn.png" width="85%" alt="Esquema de Base de Datos" />
+</div>
+</details>
+
+> Documentación técnica completa en [`docs/Analisis_Funcional_SCO.md`](docs/Analisis_Funcional_SCO.md).
 
 ## Ejecutar la aplicación
 
